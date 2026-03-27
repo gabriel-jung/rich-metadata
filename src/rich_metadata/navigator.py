@@ -467,6 +467,7 @@ class BaseNavigator:
                             page_size=n if n <= 100 else 25,
                             skip_render=bool(sec.columns),
                         )
+                        self.display.header(entity)
 
             elif total_sections < choice <= total_sections + total_header_links:
                 _, link_type, link_ref = header_links[

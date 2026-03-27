@@ -2,7 +2,7 @@
 
 A Rich-based TUI toolkit for building metadata browsers.
 
-Provides the shared display and navigation layer behind packages like [pymetallum](https://github.com/gabriel-jung/pymetallum). Define your entities declaratively, wire up your API, and get an interactive terminal browser with pagination, navigation, lazy loading, and image support — for free.
+Provides the shared display and navigation layer behind packages like [pymetallum](https://github.com/gabriel-jung/pymetallum). Define your entities declaratively, wire up your API, and get an interactive terminal browser with pagination, navigation, lazy loading, and image support.
 
 ## Install
 
