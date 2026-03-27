@@ -1,6 +1,7 @@
 [build-system]
-requires = ["uv-build>=0.10.12,<0.12.0"]
+requires = ["uv-build>=0.10.12"]
 build-backend = "uv_build"
+
 
 [project]
 name = "rich-metadata"
@@ -11,31 +12,42 @@ authors = [
 description = "A Rich-based TUI toolkit for building metadata browsers."
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
+keywords = ["rich", "tui", "metadata", "terminal", "console"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Multimedia :: Sound/Audio",
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
-    "rich>=14.0.0",
+    "rich>=13.0.0",
     "loguru>=0.7.3",
 ]
+
 
 [project.urls]
 Homepage = "https://github.com/gabriel-jung/rich-metadata"
 Repository = "https://github.com/gabriel-jung/rich-metadata"
+"Bug Tracker" = "https://github.com/gabriel-jung/rich-metadata/issues"
+
 
 [tool.ruff]
 target-version = "py310"
 line-length = 110
 
+
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 ignore = ["RUF022", "B904"]
+
 
 [dependency-groups]
 dev = [
