@@ -194,6 +194,7 @@ class EntityDef:
     sections: list[SectionDef] = field(default_factory=list)  # detail sections
     header_links: list[HeaderLink] = field(default_factory=list)  # interactive navigation links
     footer: list[str | Callable[[dict], str | None]] | None = None  # keys or callables for lines below the panel
+    auto_full: bool = False  # if True, show all sections inline (no interactive menu)
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────

@@ -125,11 +125,19 @@ class BaseNavigator:
         """Shortcut to the display engine's console."""
         return self.display.console
 
-    def navigate(self, entity: dict) -> None:
+    def navigate(
+        self,
+        entity: dict,
+        *,
+        siblings: list[dict] | None = None,
+        sibling_index: int = 0,
+    ) -> None:
         """Interactive display with section menu and back-navigation."""
         self._history.append(entity)
         try:
-            self._interactive_loop(entity)
+            self._interactive_loop(
+                entity, siblings=siblings, sibling_index=sibling_index,
+            )
         finally:
             self._history.pop()
 
@@ -321,7 +329,7 @@ class BaseNavigator:
                 self.display.details(target)
                 return
 
-            self.navigate(target)
+            self.navigate(target, siblings=results, sibling_index=idx)
             if not loop:
                 return
             # Re-display after coming back
@@ -378,7 +386,13 @@ class BaseNavigator:
 
     # ── Interactive loop ─────────────────────────────────────────────────
 
-    def _interactive_loop(self, entity: dict) -> None:
+    def _interactive_loop(
+        self,
+        entity: dict,
+        *,
+        siblings: list[dict] | None = None,
+        sibling_index: int = 0,
+    ) -> None:
         """Section menu loop with lazy fetching and header link navigation."""
         self.display.header(entity)
 
@@ -392,6 +406,94 @@ class BaseNavigator:
 
         if not sections and not header_links:
             return
+
+        if defn.auto_full:
+            self._auto_full_loop(
+                entity, sections, siblings=siblings, sibling_index=sibling_index,
+            )
+            return
+
+        self._section_menu(
+            entity, entity_type, defn, sections, header_links,
+            siblings=siblings, sibling_index=sibling_index,
+        )
+
+    def _fetch_sibling(self, siblings: list[dict], idx: int) -> dict | None:
+        """Fetch a sibling entity by index and update navigation history."""
+        item = siblings[idx]
+        ref = self.get_entity_ref(item)
+        entity = self.fetch_entity(item["_type"], ref) if ref else item
+        if entity:
+            self._history[-1] = entity
+        return entity
+
+    def _sibling_hints(
+        self, entity_type: str, siblings: list[dict] | None, idx: int,
+    ) -> tuple[bool, bool]:
+        """Print prev/next hints if siblings are available. Returns (has_prev, has_next)."""
+        has_prev = bool(siblings and idx > 0)
+        has_next = bool(siblings and idx < len(siblings) - 1)
+        if has_prev or has_next:
+            hints = []
+            if has_prev:
+                hints.append(f"[bold]p[/bold]rev {entity_type}")
+            if has_next:
+                hints.append(f"[bold]n[/bold]ext {entity_type}")
+            self.console.print(f"  [dim]{' | '.join(hints)}[/dim]")
+        return has_prev, has_next
+
+    def _auto_full_loop(
+        self,
+        entity: dict,
+        sections: list,
+        *,
+        siblings: list[dict] | None = None,
+        sibling_index: int = 0,
+    ) -> None:
+        """Display all sections inline, with optional prev/next navigation."""
+        idx = sibling_index
+        entity_type = entity["_type"]
+
+        while True:
+            for sec in sections:
+                if not entity.get(sec.key) and sec.lazy:
+                    fetcher = self.get_lazy_fetcher(entity_type, sec.key)
+                    if fetcher:
+                        with self.console.status(f"Fetching {sec.label}..."):
+                            entity[sec.key] = fetcher(entity)
+                if entity.get(sec.key):
+                    self.display.section(entity, sec.key)
+
+            self.console.print()
+            has_prev, has_next = self._sibling_hints(entity_type, siblings, idx)
+            self.console.print(
+                "  [dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]"
+            )
+
+            try:
+                raw = self.console.input("\n[bold]>[/bold] ").strip().lower()
+            except (KeyboardInterrupt, EOFError):
+                raise QuitSignal()
+
+            if raw == "n" and has_next:
+                idx += 1
+            elif raw == "p" and has_prev:
+                idx -= 1
+            else:
+                return
+
+            entity = self._fetch_sibling(siblings, idx)
+            if not entity:
+                return
+            entity_type = entity["_type"]
+            self.display.header(entity)
+
+    def _section_menu(
+        self, entity, entity_type, defn, sections, header_links,
+        *, siblings=None, sibling_index=0,
+    ):
+        """Interactive section menu with lazy fetching and header link navigation."""
+        idx = sibling_index
 
         while True:
             self.console.print()
@@ -412,12 +514,14 @@ class BaseNavigator:
                     )
 
             for j, (link_label, _link_type, _link_ref) in enumerate(header_links):
-                idx = len(sections) + 1 + j
+                menu_idx = len(sections) + 1 + j
                 self.console.print(
-                    f"  [bold cyan]\\[{idx}][/bold cyan] {link_label} [dim]\u2192[/dim]"
+                    f"  [bold cyan]\\[{menu_idx}][/bold cyan] {link_label} [dim]\u2192[/dim]"
                 )
 
             self.console.print()
+            has_prev, has_next = self._sibling_hints(entity_type, siblings, idx)
+
             back_label = "go back" if len(self._history) > 1 else "exit"
             self.console.print(
                 f"  [dim][bold]0[/bold] to {back_label} | Ctrl+C to quit[/dim]"
@@ -431,6 +535,33 @@ class BaseNavigator:
             if not raw:
                 continue
 
+            # Sibling navigation
+            raw_lower = raw.lower()
+            if raw_lower == "n" and has_next:
+                idx += 1
+                entity = self._fetch_sibling(siblings, idx)
+                if not entity:
+                    return
+                entity_type = entity["_type"]
+                defn = self.display.get_def(entity_type)
+                sections = defn.sections
+                header_links = self.get_header_links(entity)
+                self.display.header(entity)
+                continue
+
+            if raw_lower == "p" and has_prev:
+                idx -= 1
+                entity = self._fetch_sibling(siblings, idx)
+                if not entity:
+                    return
+                entity_type = entity["_type"]
+                defn = self.display.get_def(entity_type)
+                sections = defn.sections
+                header_links = self.get_header_links(entity)
+                self.display.header(entity)
+                continue
+
+            # Numeric input
             try:
                 choice = int(raw)
             except ValueError:
@@ -445,7 +576,6 @@ class BaseNavigator:
             if 1 <= choice <= total_sections:
                 sec = sections[choice - 1]
 
-                # Lazy fetch if needed
                 if not entity.get(sec.key) and sec.lazy:
                     fetcher = self.get_lazy_fetcher(entity_type, sec.key)
                     if fetcher:
@@ -454,7 +584,6 @@ class BaseNavigator:
 
                 self.display.section(entity, sec.key)
 
-                # Offer navigation into section items
                 if sec.navigable:
                     items = self.get_navigable_items(
                         entity_type, sec.key, entity,
@@ -573,7 +702,9 @@ class BaseNavigator:
                     target = item
 
                 if target:
-                    self.navigate(target)
+                    self.navigate(
+                        target, siblings=items, sibling_index=idx,
+                    )
                     # Re-display current page after coming back
                     if title:
                         self.console.print()
