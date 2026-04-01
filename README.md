@@ -1,8 +1,8 @@
 # rich-metadata
 
-A Rich-based TUI toolkit for building metadata browsers.
+A Rich-based TUI toolkit for building interactive metadata browsers.
 
-Provides the shared display and navigation layer behind packages like [pymetallum](https://github.com/gabriel-jung/pymetallum). Define your entities declaratively, wire up your API, and get an interactive terminal browser with pagination, navigation, lazy loading, and image support.
+Define your entities declaratively, wire up your API, and get an interactive terminal browser with pagination, navigation, lazy loading, and image support.
 
 ## Install
 
@@ -25,70 +25,62 @@ from rich_metadata import (
 )
 
 # 1. Define your entities
-band_def = EntityDef(
-    type_name="band",
+book_def = EntityDef(
+    type_name="book",
     summary=[
-        SummaryField(key="name", style="bold"),
-        SummaryField(key="country", style="dim"),
-        SummaryField(key="genre"),
+        SummaryField(key="title", style="bold"),
+        SummaryField(prefix="by ", key="author"),
+        SummaryField(key="year", style="dim"),
     ],
     header_fields=[
-        HeaderField("Status", "status"),
-        HeaderField("Genre", "genre"),
-        HeaderField("Origin", transform=lambda d: d.get("country", "")),
+        HeaderField("Author", key="author"),
+        HeaderField("Year", key="year"),
+        HeaderField("Genre", key="genre"),
+        HeaderField("Pages", key="pages"),
+        HeaderField("Publisher", key="publisher"),
     ],
     sections=[
         SectionDef(
-            key="discography",
-            label="Discography",
+            "chapters",
             navigable=True,
             columns=[
-                TableColumn("Year", "year", width=6),
-                TableColumn("Title", "name", style="bold"),
-                TableColumn("Type", "type"),
+                TableColumn("#", "number", width=4),
+                TableColumn("Title", "title", style="bold"),
+                TableColumn("Pages", "pages"),
             ],
         ),
-        SectionDef(
-            key="members",
-            label="Members",
-            columns=[
-                TableColumn("Name", "name", style="bold"),
-                TableColumn("Role", "role"),
-            ],
-        ),
-        SectionDef(
-            key="bio",
-            label="Biography",
-            lazy=True,
-        ),
+        SectionDef("description", lazy=True),
     ],
     header_links=[
-        HeaderLink("Label: {label}", "label", ref_key="label_url"),
+        HeaderLink("Author: {author}", "author", ref_key="author_url"),
     ],
     footer=["url"],
 )
 
 # 2. Create a display engine and register definitions
 engine = DisplayEngine()
-engine.register(band_def)
+engine.register(book_def)
 
 # 3. Use the engine directly
-entity = {"_type": "band", "name": "Summoning", "genre": "Epic Black Metal", ...}
+entity = {"_type": "book", "title": "Dune", "author": "Frank Herbert", "year": "1965"}
 engine.details(entity)    # render header + all sections
 engine.summary(entity)    # one-line summary
 engine.header(entity)     # header panel with image
 
 # 4. Or wire up a navigator for interactive browsing
-class MyAPI:
+class BookAPI:
     def get(self, ref: str) -> dict:
         ...  # fetch entity by URL/ID, return dict with "_type" key
 
+    def search(self, query: str) -> list[dict]:
+        ...  # return list of entity dicts
+
 navigator = BaseNavigator(
     engine,
-    apis={"band": MyAPI(), "album": MyAPI()},
+    apis={"book": BookAPI(), "author": AuthorAPI()},
     entity_ref_key="url",
     lazy_fetchers={
-        ("band", "bio"): lambda api, entity: api.fetch_bio(entity["id"]),
+        ("book", "description"): lambda api, entity: api.fetch_description(entity["id"]),
     },
 )
 navigator.navigate(entity)  # interactive section menu
@@ -102,7 +94,7 @@ navigator.browse(fetch_page=my_search_fn)  # paginated results
 Entities are plain Python dicts with a `_type` key for routing:
 
 ```python
-{"_type": "album", "name": "Minas Morgul", "band": "Summoning", "year": "1995"}
+{"_type": "book", "title": "Dune", "author": "Frank Herbert", "year": "1965"}
 ```
 
 ### EntityDef
@@ -125,11 +117,11 @@ Declares how an entity type is displayed. Each `EntityDef` configures:
 
 Defines a content section. The rendering mode is auto-detected:
 
-- Has `columns` → **table** (if data is a `list`, rows are flat; if `dict[str, list]`, rows are grouped with headers — e.g. "Current"/"Past" members, or "Disc 1"/"Disc 2" tracks)
-- Has `custom_render` → **custom** rendering function
-- Neither → **text** panel
+- Has `columns` -> **table** (if data is a `list`, rows are flat; if `dict[str, list]`, rows are grouped with headers)
+- Has `custom_render` -> **custom** rendering function
+- Neither -> **text** panel
 
-Key options: `navigable` (items can be drilled into), `lazy` (fetched on demand), `duration_key` (sums and shows total duration for tracklists).
+Key options: `navigable` (items can be drilled into), `lazy` (fetched on demand), `duration_key` (sums and shows total duration).
 
 ### SummaryField
 
@@ -145,7 +137,7 @@ A column in a table section. Supports `style`, `justify`, `width`, and `transfor
 
 ### HeaderLink
 
-A navigable link shown in the section menu (e.g., "Band: Summoning →"). Uses `ref_key` to read a URL/ID from the entity dict, or `ref_fn(entity) -> str | None` for computed refs.
+A navigable link shown in the section menu (e.g., "Author: Frank Herbert ->"). Uses `ref_key` to read a URL/ID from the entity dict, or `ref_fn(entity) -> str | None` for computed refs.
 
 ## DisplayEngine
 
@@ -158,7 +150,7 @@ engine = DisplayEngine(my_console)    # custom console
 engine.register(entity_def)           # register an EntityDef
 engine.summary(entity)                # one-line summary
 engine.header(entity)                 # detail panel with optional image
-engine.section(entity, "discography") # render a single section
+engine.section(entity, "chapters")    # render a single section
 engine.details(entity)                # header + all non-lazy sections
 engine.select_from_list(items)        # numbered selection prompt
 ```
@@ -170,26 +162,28 @@ Interactive browser with pagination, back-navigation, and lazy fetching.
 ```python
 navigator = BaseNavigator(
     engine,
-    apis={"band": band_api, "album": album_api},
+    apis={"book": book_api, "author": author_api},
     entity_ref_key="url",
     lazy_fetchers={
-        ("band", "description"): lambda api, entity: api.fetch_desc(entity["id"]),
+        ("book", "description"): lambda api, entity: api.fetch_desc(entity["id"]),
     },
 )
 ```
 
 | Parameter | Purpose |
 |-----------|---------|
-| `apis` | `{type: api}` — each API must have a `.get(ref)` method |
+| `apis` | `{type: api}` -- each API must have a `.get(ref)` method |
 | `entity_ref_key` | Key to extract the navigable ref from item dicts (default: `"url"`) |
 | `lazy_fetchers` | `{(type, section): callable(api, entity) -> data}` for lazy sections |
 
 Key methods:
 
-- **`navigate(entity)`** — Interactive loop: shows header, section menu, lazy fetching, header link navigation, and back-navigation.
-- **`browse(fetch_page=..., ...)`** — Paginated results with selection. `fetch_page(start, count)` returns `(results, total)`.
+- **`navigate(entity)`** -- Interactive loop: shows header, section menu, lazy fetching, header link navigation, and back-navigation.
+- **`search_and_navigate(query, types)`** -- Search, select from results, and navigate. Re-shows the results list on back.
+- **`browse(fetch_page=..., ...)`** -- Paginated results with selection. `fetch_page(start, count)` returns `(results, total)`.
+- **`browse_sources(sources)`** -- Pick from named browsable sources, then browse the selected one.
 
-Items with `_type` but no ref (no `url` or whatever `entity_ref_key` is) are treated as **inline entities** — they are navigated directly without fetching. This is useful for items that already contain all their data or use lazy sections to load additional content.
+Items with `_type` but no ref (no `url` or whatever `entity_ref_key` is) are treated as **inline entities** -- navigated directly without fetching.
 
 ## CLI helpers
 

@@ -131,12 +131,14 @@ class BaseNavigator:
         *,
         siblings: list[dict] | None = None,
         sibling_index: int = 0,
+        can_go_back: bool = False,
     ) -> None:
         """Interactive display with section menu and back-navigation."""
         self._history.append(entity)
         try:
             self._interactive_loop(
                 entity, siblings=siblings, sibling_index=sibling_index,
+                can_go_back=can_go_back,
             )
         finally:
             self._history.pop()
@@ -193,22 +195,30 @@ class BaseNavigator:
             self.console.print("[yellow]No items found matching your criteria.[/yellow]")
             return
 
-        selected = self.display.select_from_list(all_results)
-        if not selected:
-            return
+        while True:
+            selected = self.display.select_from_list(all_results)
+            if not selected:
+                return
 
-        ref = self.get_entity_ref(selected)
-        if not ref:
-            self.console.print("[dim]This item is not navigable.[/dim]")
-            return
+            ref = self.get_entity_ref(selected)
+            if not ref:
+                self.console.print("[dim]This item is not navigable.[/dim]")
+                continue
 
-        fetch_full = json_output or full
-        entity = self.fetch_entity(selected["_type"], ref, full=fetch_full)
-        if not entity:
-            self.console.print("[red]Could not retrieve detailed information.[/red]")
-            return
+            fetch_full = json_output or full
+            entity = self.fetch_entity(selected["_type"], ref, full=fetch_full)
+            if not entity:
+                self.console.print("[red]Could not retrieve detailed information.[/red]")
+                continue
 
-        self.display_or_navigate(entity, json_output=json_output, full=full)
+            if json_output:
+                print(json.dumps(strip_internal_keys(entity), indent=2))
+                return
+            elif full:
+                self.display.details(entity)
+                return
+            else:
+                self.navigate(entity, can_go_back=True)
 
     def browse(
         self,
@@ -322,7 +332,7 @@ class BaseNavigator:
                     self.console.print("[red]Could not fetch details.[/red]")
                     continue
             else:
-                # Item is already a complete entity (e.g. inline song)
+                # Item is already a complete entity (inline, no ref to fetch)
                 target = item
 
             if full:
@@ -392,6 +402,7 @@ class BaseNavigator:
         *,
         siblings: list[dict] | None = None,
         sibling_index: int = 0,
+        can_go_back: bool = False,
     ) -> None:
         """Section menu loop with lazy fetching and header link navigation."""
         self.display.header(entity)
@@ -410,12 +421,14 @@ class BaseNavigator:
         if defn.auto_full:
             self._auto_full_loop(
                 entity, sections, siblings=siblings, sibling_index=sibling_index,
+                can_go_back=can_go_back,
             )
             return
 
         self._section_menu(
             entity, entity_type, defn, sections, header_links,
             siblings=siblings, sibling_index=sibling_index,
+            can_go_back=can_go_back,
         )
 
     def _fetch_sibling(self, siblings: list[dict], idx: int) -> dict | None:
@@ -449,6 +462,7 @@ class BaseNavigator:
         *,
         siblings: list[dict] | None = None,
         sibling_index: int = 0,
+        can_go_back: bool = False,
     ) -> None:
         """Display all sections inline, with optional prev/next navigation."""
         idx = sibling_index
@@ -466,8 +480,10 @@ class BaseNavigator:
 
             self.console.print()
             has_prev, has_next = self._sibling_hints(entity_type, siblings, idx)
+            back = len(self._history) > 1 or siblings or can_go_back
+            back_label = "go back" if back else "exit"
             self.console.print(
-                "  [dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]"
+                f"  [dim][bold]0[/bold] to {back_label} | Ctrl+C to quit[/dim]"
             )
 
             try:
@@ -490,7 +506,7 @@ class BaseNavigator:
 
     def _section_menu(
         self, entity, entity_type, defn, sections, header_links,
-        *, siblings=None, sibling_index=0,
+        *, siblings=None, sibling_index=0, can_go_back=False,
     ):
         """Interactive section menu with lazy fetching and header link navigation."""
         idx = sibling_index
@@ -522,7 +538,8 @@ class BaseNavigator:
             self.console.print()
             has_prev, has_next = self._sibling_hints(entity_type, siblings, idx)
 
-            back_label = "go back" if len(self._history) > 1 else "exit"
+            back = len(self._history) > 1 or siblings or can_go_back
+            back_label = "go back" if back else "exit"
             self.console.print(
                 f"  [dim][bold]0[/bold] to {back_label} | Ctrl+C to quit[/dim]"
             )
@@ -695,11 +712,7 @@ class BaseNavigator:
                     continue
 
                 ref = self.get_entity_ref(item)
-                if ref:
-                    target = self.fetch_entity(item["_type"], ref)
-                else:
-                    # Item is already a complete entity (e.g. inline song)
-                    target = item
+                target = self.fetch_entity(item["_type"], ref) if ref else item
 
                 if target:
                     self.navigate(

@@ -38,7 +38,7 @@ class SummaryField:
     style: str = ""  # Rich style applied to the field (e.g. "bold", "dim")
     prefix: str = ""  # text prepended to the value (e.g. "by ")
     fallback: str = ""  # shown when the key is missing or empty
-    transform: Callable[[Any], str] | None = None  # with key: transform(value); without key: transform(entity)
+    transform: Callable[[Any], str] | None = None  # transform(value) or transform(entity)
 
 
 @dataclass
@@ -57,7 +57,7 @@ class HeaderField:
 
     label: str  # left-column label shown in the grid
     key: str = ""  # entity dict key to extract the value from
-    transform: Callable[[Any], str] | None = None  # with key: transform(value); without key: transform(entity)
+    transform: Callable[[Any], str] | None = None  # transform(value) or transform(entity)
 
 
 @dataclass
@@ -90,14 +90,14 @@ class SectionDef:
     - Neither → text panel
 
     ``label`` defaults to the key with underscores replaced by spaces and
-    title-cased (e.g. ``"similar_artists"`` → ``"Similar Artists"``).
+    title-cased (e.g. ``"related_items"`` → ``"Related Items"``).
 
     Example::
 
-        SectionDef("tracklist", navigable=True, duration_key="duration",
-                   columns=[TableColumn("Title", "name"), TableColumn("Duration", "duration")])
-        SectionDef("biography", lazy=True)
-        SectionDef("members", navigable=True,
+        SectionDef("chapters", navigable=True,
+                   columns=[TableColumn("Title", "name"), TableColumn("Pages", "pages")])
+        SectionDef("description", lazy=True)
+        SectionDef("contributors", navigable=True,
                    columns=[TableColumn("Name", "name"), TableColumn("Role", "role")])
     """
 
@@ -127,9 +127,9 @@ class HeaderLink:
 
     Example::
 
-        HeaderLink("Label: {current_label}", "label", ref_key="label_url")
-        HeaderLink("Band: {band}", "band",
-                   ref_fn=lambda d: f"https://site.com/band/{d['band_id']}")
+        HeaderLink("Publisher: {publisher}", "publisher", ref_key="publisher_url")
+        HeaderLink("Author: {author}", "author",
+                   ref_fn=lambda d: f"https://site.com/author/{d['author_id']}")
     """
 
     label: str  # display label with {key} placeholders
@@ -163,26 +163,26 @@ class EntityDef:
 
     Example::
 
-        band_def = EntityDef(
-            type_name="band",
+        book_def = EntityDef(
+            type_name="book",
             summary=[
-                SummaryField(key="name", style="bold"),
-                SummaryField(key="genre"),
+                SummaryField(key="title", style="bold"),
+                SummaryField(prefix="by ", key="author"),
             ],
             header_fields=[
-                HeaderField("Genre", key="genre"),
-                HeaderField("Status", key="status"),
+                HeaderField("Author", key="author"),
+                HeaderField("Year", key="year"),
             ],
             sections=[
-                SectionDef(key="discography", label="Discography", navigable=True,
+                SectionDef(key="chapters", label="Chapters", navigable=True,
                            columns=[TableColumn("Title", "name", style="bold")]),
             ],
             header_links=[
-                HeaderLink("Label: {label}", "label", ref_key="label_url"),
+                HeaderLink("Author: {author}", "author", ref_key="author_url"),
             ],
         )
         engine = DisplayEngine()
-        engine.register(band_def)
+        engine.register(book_def)
     """
 
     type_name: str  # matches the ``_type`` field in entity dicts
@@ -193,7 +193,7 @@ class EntityDef:
     panel_border_style: str = "blue"  # Rich border style for the header panel
     sections: list[SectionDef] = field(default_factory=list)  # detail sections
     header_links: list[HeaderLink] = field(default_factory=list)  # interactive navigation links
-    footer: list[str | Callable[[dict], str | None]] | None = None  # keys or callables for lines below the panel
+    footer: list[str | Callable[[dict], str | None]] | None = None  # keys or callables for footer lines
     auto_full: bool = False  # if True, show all sections inline (no interactive menu)
 
 
@@ -201,7 +201,7 @@ class EntityDef:
 
 
 def _deep_get(d: dict, key: str, default=""):
-    """Get a value by key, supporting dot-notation for nested access (e.g. 'band.name')."""
+    """Get a value by key, supporting dot-notation for nested access (e.g. 'author.name')."""
     if "." not in key:
         return d.get(key, default)
     for part in key.split("."):

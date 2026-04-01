@@ -3,8 +3,8 @@
 from .cli import (
     configure_logging,
     list_fetcher,
-    page_fetcher,
     months_in_range,
+    page_fetcher,
     parse_date,
     parse_date_args,
     resolve_entity_type,
