@@ -125,6 +125,14 @@ class BaseNavigator:
         """Shortcut to the display engine's console."""
         return self.display.console
 
+    def _input(self, prompt: str, *, lower: bool = True) -> str:
+        """Read a line from the console, raising ``QuitSignal`` on Ctrl+C / EOF."""
+        try:
+            raw = self.console.input(prompt).strip()
+        except (KeyboardInterrupt, EOFError):
+            raise QuitSignal()
+        return raw.lower() if lower else raw
+
     def navigate(
         self,
         entity: dict,
@@ -277,10 +285,7 @@ class BaseNavigator:
                 "[dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]"
             )
 
-            try:
-                raw = self.console.input("[bold]>[/bold] ").strip().lower()
-            except (KeyboardInterrupt, EOFError):
-                raise QuitSignal()
+            raw = self._input("[bold]>[/bold] ")
 
             if not raw:
                 continue
@@ -374,10 +379,7 @@ class BaseNavigator:
                 "  [dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]"
             )
 
-            try:
-                raw = self.console.input("\n[bold]Choose:[/bold] ").strip()
-            except (KeyboardInterrupt, EOFError):
-                raise QuitSignal()
+            raw = self._input("\n[bold]Choose:[/bold] ", lower=False)
 
             if not raw:
                 continue
@@ -486,10 +488,7 @@ class BaseNavigator:
                 f"  [dim][bold]0[/bold] to {back_label} | Ctrl+C to quit[/dim]"
             )
 
-            try:
-                raw = self.console.input("\n[bold]>[/bold] ").strip().lower()
-            except (KeyboardInterrupt, EOFError):
-                raise QuitSignal()
+            raw = self._input("\n[bold]>[/bold] ")
 
             if raw == "n" and has_next:
                 idx += 1
@@ -544,30 +543,16 @@ class BaseNavigator:
                 f"  [dim][bold]0[/bold] to {back_label} | Ctrl+C to quit[/dim]"
             )
 
-            try:
-                raw = self.console.input("\n[bold]Choose:[/bold] ").strip()
-            except (KeyboardInterrupt, EOFError):
-                raise QuitSignal()
+            raw = self._input("\n[bold]Choose:[/bold] ", lower=False)
 
             if not raw:
                 continue
 
             # Sibling navigation
             raw_lower = raw.lower()
-            if raw_lower == "n" and has_next:
-                idx += 1
-                entity = self._fetch_sibling(siblings, idx)
-                if not entity:
-                    return
-                entity_type = entity["_type"]
-                defn = self.display.get_def(entity_type)
-                sections = defn.sections
-                header_links = self.get_header_links(entity)
-                self.display.header(entity)
-                continue
-
-            if raw_lower == "p" and has_prev:
-                idx -= 1
+            step = 1 if raw_lower == "n" and has_next else -1 if raw_lower == "p" and has_prev else 0
+            if step:
+                idx += step
                 entity = self._fetch_sibling(siblings, idx)
                 if not entity:
                     return
@@ -673,10 +658,7 @@ class BaseNavigator:
                 "[dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]"
             )
 
-            try:
-                raw = self.console.input("[bold]>[/bold] ").strip().lower()
-            except (KeyboardInterrupt, EOFError):
-                raise QuitSignal()
+            raw = self._input("[bold]>[/bold] ")
 
             if not raw:
                 continue

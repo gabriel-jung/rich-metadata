@@ -104,10 +104,6 @@ class SectionDef:
     key: str  # entity dict key holding the section data
     label: str = ""  # display label (default: derived from key)
     columns: list[TableColumn] = field(default_factory=list)  # columns for table sections
-
-    def __post_init__(self):
-        if not self.label:
-            self.label = self.key.replace("_", " ").title()
     navigable: bool = False  # whether items can be selected for navigation
     lazy: bool = False  # if True, data is fetched on demand (not on initial load)
     numbered: bool = True  # show row numbers in tables
@@ -115,6 +111,10 @@ class SectionDef:
     group_key: str | None = None  # item key to group a list[dict] into a dict[str, list]
     custom_render: Callable[[Console, dict], None] | None = None  # custom render function
     nav_items: Callable[[dict], list] | None = None  # custom extractor for navigable items
+
+    def __post_init__(self):
+        if not self.label:
+            self.label = self.key.replace("_", " ").title()
 
 
 @dataclass
