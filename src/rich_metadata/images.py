@@ -27,6 +27,14 @@ def _detect_protocol() -> str | None:
     if "kitty" in term or term_program == "ghostty":
         return "kitty"
 
+    if term_program == "vscode":
+        vscode_version = _parse_version(env.get("TERM_PROGRAM_VERSION", ""))
+        if vscode_version >= (1, 110):
+            return "kitty"
+        if vscode_version >= (1, 80):
+            return "iterm2"
+        return None
+
     if term_program in {"iTerm.app", "WezTerm", "mintty"}:
         return "iterm2"
     if lc_terminal == "iTerm2":
@@ -34,8 +42,6 @@ def _detect_protocol() -> str | None:
     if env.get("KONSOLE_VERSION"):
         return "iterm2"
     if env.get("CURSOR_TRACE_ID"):
-        return "iterm2"
-    if term_program == "vscode" and _parse_version(env.get("TERM_PROGRAM_VERSION", "")) >= (1, 80):
         return "iterm2"
     if term == "contour":
         return "iterm2"
