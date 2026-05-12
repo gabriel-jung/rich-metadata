@@ -7,6 +7,8 @@ import sys
 from rich.console import Console
 from rich.panel import Panel
 
+from .terminal import _parse_version
+
 IMAGE_ROWS = 8
 IMAGE_COLS = 22
 MIN_PANEL_WIDTH = 40
@@ -17,18 +19,25 @@ def _detect_protocol() -> str | None:
     if not sys.stdout.isatty():
         return None
 
-    term = os.environ.get("TERM", "")
-    term_program = os.environ.get("TERM_PROGRAM", "")
-    lc_terminal = os.environ.get("LC_TERMINAL", "")
+    env = os.environ
+    term = env.get("TERM", "")
+    term_program = env.get("TERM_PROGRAM", "")
+    lc_terminal = env.get("LC_TERMINAL", "")
 
-    if "kitty" in term:
+    if "kitty" in term or term_program == "ghostty":
         return "kitty"
 
-    # iTerm2 protocol is supported by: iTerm2, WezTerm, Mintty, Konsole
-    # Note: VSCode's integrated terminal has unreliable image support — excluded.
     if term_program in {"iTerm.app", "WezTerm", "mintty"}:
         return "iterm2"
     if lc_terminal == "iTerm2":
+        return "iterm2"
+    if env.get("KONSOLE_VERSION"):
+        return "iterm2"
+    if env.get("CURSOR_TRACE_ID"):
+        return "iterm2"
+    if term_program == "vscode" and _parse_version(env.get("TERM_PROGRAM_VERSION", "")) >= (1, 80):
+        return "iterm2"
+    if term == "contour":
         return "iterm2"
 
     return None
