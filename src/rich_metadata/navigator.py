@@ -195,7 +195,8 @@ class BaseNavigator:
                     all_results.extend(api.search(query, exact_match=False))
 
         if exact_first:
-            exact = [r for r in all_results if r["name"].lower() == query.lower()]
+            q = query.lower()
+            exact = [r for r in all_results if r.get("name", "").lower() == q]
             if exact:
                 all_results = exact
 
@@ -342,12 +343,10 @@ class BaseNavigator:
 
             if full:
                 self.display.details(target)
-                return
-
-            self.navigate(target, siblings=results, sibling_index=idx)
+            else:
+                self.navigate(target, siblings=results, sibling_index=idx)
             if not loop:
                 return
-            # Re-display after coming back
             render(results, start)
 
     def browse_sources(
@@ -436,11 +435,22 @@ class BaseNavigator:
     def _fetch_sibling(self, siblings: list[dict], idx: int) -> dict | None:
         """Fetch a sibling entity by index and update navigation history."""
         item = siblings[idx]
+        item_type = item.get("_type")
+        if not item_type:
+            return None
         ref = self.get_entity_ref(item)
-        entity = self.fetch_entity(item["_type"], ref) if ref else item
+        entity = self.fetch_entity(item_type, ref) if ref else item
         if entity:
             self._history[-1] = entity
         return entity
+
+    def _back_prompt(self, siblings: list[dict] | None, can_go_back: bool) -> None:
+        """Print the '0 to go back | Ctrl+C to quit' line."""
+        back = len(self._history) > 1 or siblings or can_go_back
+        label = "go back" if back else "exit"
+        self.console.print(
+            f"  [dim][bold]0[/bold] to {label} | Ctrl+C to quit[/dim]"
+        )
 
     def _sibling_hints(
         self, entity_type: str, siblings: list[dict] | None, idx: int,
@@ -482,11 +492,7 @@ class BaseNavigator:
 
             self.console.print()
             has_prev, has_next = self._sibling_hints(entity_type, siblings, idx)
-            back = len(self._history) > 1 or siblings or can_go_back
-            back_label = "go back" if back else "exit"
-            self.console.print(
-                f"  [dim][bold]0[/bold] to {back_label} | Ctrl+C to quit[/dim]"
-            )
+            self._back_prompt(siblings, can_go_back)
 
             raw = self._input("\n[bold]>[/bold] ")
 
@@ -536,21 +542,20 @@ class BaseNavigator:
 
             self.console.print()
             has_prev, has_next = self._sibling_hints(entity_type, siblings, idx)
-
-            back = len(self._history) > 1 or siblings or can_go_back
-            back_label = "go back" if back else "exit"
-            self.console.print(
-                f"  [dim][bold]0[/bold] to {back_label} | Ctrl+C to quit[/dim]"
-            )
+            self._back_prompt(siblings, can_go_back)
 
             raw = self._input("\n[bold]Choose:[/bold] ", lower=False)
 
             if not raw:
                 continue
 
-            # Sibling navigation
             raw_lower = raw.lower()
-            step = 1 if raw_lower == "n" and has_next else -1 if raw_lower == "p" and has_prev else 0
+            if raw_lower == "n" and has_next:
+                step = 1
+            elif raw_lower == "p" and has_prev:
+                step = -1
+            else:
+                step = 0
             if step:
                 idx += step
                 entity = self._fetch_sibling(siblings, idx)
@@ -558,6 +563,8 @@ class BaseNavigator:
                     return
                 entity_type = entity["_type"]
                 defn = self.display.get_def(entity_type)
+                if not defn:
+                    return
                 sections = defn.sections
                 header_links = self.get_header_links(entity)
                 self.display.header(entity)
@@ -700,7 +707,6 @@ class BaseNavigator:
                     self.navigate(
                         target, siblings=items, sibling_index=idx,
                     )
-                    # Re-display current page after coming back
                     if title:
                         self.console.print()
                         self.console.rule(title, style="dim")

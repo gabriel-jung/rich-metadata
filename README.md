@@ -69,11 +69,13 @@ engine.header(entity)     # header panel with image
 
 # 4. Or wire up a navigator for interactive browsing
 class BookAPI:
-    def get(self, ref: str) -> dict:
+    def get(self, ref: str, *, full: bool = False, **kwargs) -> dict | None:
         ...  # fetch entity by URL/ID, return dict with "_type" key
+        # `full=True` is passed when the caller wants every section eagerly
+        # populated (e.g. `--json` / `--full` flows). Extra kwargs are forwarded.
 
-    def search(self, query: str) -> list[dict]:
-        ...  # return list of entity dicts
+    def search(self, query: str, exact_match: bool = True) -> list[dict]:
+        ...  # return list of entity dicts (each with "_type" and "name")
 
 navigator = BaseNavigator(
     engine,
@@ -111,7 +113,8 @@ Declares how an entity type is displayed. Each `EntityDef` configures:
 | `panel_border_style` | Rich style for the header panel border |
 | `sections` | Expandable content sections (`SectionDef` list) |
 | `header_links` | Navigable links shown in the section menu (`HeaderLink` list) |
-| `footer` | Keys (strings) or callables for lines below the panel |
+| `footer` | Keys (strings) or callables `(dict) -> str \| None` for lines below the panel |
+| `auto_full` | If True, render every section inline (no menu) and offer prev/next sibling navigation |
 
 ### SectionDef
 
@@ -172,18 +175,32 @@ navigator = BaseNavigator(
 
 | Parameter | Purpose |
 |-----------|---------|
-| `apis` | `{type: api}` -- each API must have a `.get(ref)` method |
+| `apis` | `{type: api}`. Each API needs `.get(ref, *, full=False, **kwargs)` and (for `search_and_navigate`) `.search(query, exact_match=True)` |
 | `entity_ref_key` | Key to extract the navigable ref from item dicts (default: `"url"`) |
 | `lazy_fetchers` | `{(type, section): callable(api, entity) -> data}` for lazy sections |
 
 Key methods:
 
-- **`navigate(entity)`** -- Interactive loop: shows header, section menu, lazy fetching, header link navigation, and back-navigation.
-- **`search_and_navigate(query, types)`** -- Search, select from results, and navigate. Re-shows the results list on back.
-- **`browse(fetch_page=..., ...)`** -- Paginated results with selection. `fetch_page(start, count)` returns `(results, total)`.
-- **`browse_sources(sources)`** -- Pick from named browsable sources, then browse the selected one.
+- **`navigate(entity)`** -- Interactive loop: header, section menu, lazy fetching, header link navigation, back-navigation, and prev/next sibling navigation when `siblings=` is provided.
+- **`display_or_navigate(entity, *, json_output=False, full=False)`** -- Dispatch one entity: JSON dump (internal keys stripped), full inline render, or interactive `navigate()`. Used by CLIs that share one code path for `--json` / `--full` / interactive modes.
+- **`search_and_navigate(query, types, *, exact_first=True, json_output=False, full=False)`** -- Search across `types` (each API's `.search()` is called), prefer exact name matches when `exact_first`, then select and navigate. Passes `full=` to `.get()` so backends can fetch eagerly when needed.
+- **`browse(fetch_page=..., *, render_page=None, title=None, page_size=25, full=False, loop=False)`** -- Paginated results with selection. `fetch_page(start, count) -> (results, total)`. `loop=True` re-displays the page after a child view returns (works with both `full` and interactive modes).
+- **`browse_sources(sources, *, full=False)`** -- Pick from named browsable sources (`[(label, fetch_page), ...]`), then browse the selected one. Skips the menu when only one source is supplied.
 
 Items with `_type` but no ref (no `url` or whatever `entity_ref_key` is) are treated as **inline entities** -- navigated directly without fetching.
+
+### `QuitSignal`
+
+`BaseNavigator._input` raises `QuitSignal` (an `Exception` subclass) on Ctrl+C / EOF so the interactive loops can unwind cleanly. Catch it at your CLI entry point to exit quietly:
+
+```python
+from rich_metadata import QuitSignal
+
+try:
+    navigator.navigate(entity)
+except QuitSignal:
+    pass
+```
 
 ## CLI helpers
 
