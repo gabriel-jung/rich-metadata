@@ -25,7 +25,7 @@ from .display import (
 )
 from .images import get_image_escape, show_image_beside
 from .navigator import BaseNavigator, QuitSignal
-from .terminal import link, supports_hyperlinks
+from .terminal import link, links_line, supports_hyperlinks
 
 __all__ = [
     # display
@@ -45,6 +45,7 @@ __all__ = [
     "show_image_beside",
     # terminal
     "link",
+    "links_line",
     "supports_hyperlinks",
     # navigator
     "BaseNavigator",

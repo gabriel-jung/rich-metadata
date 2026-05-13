@@ -73,3 +73,19 @@ def link(label: str, url: str | None) -> str | None:
     if not url:
         return None
     return f"[link={url}]{label}[/link]" if supports_hyperlinks() else url
+
+
+def links_line(*pairs: tuple[str, str | None]) -> str | None:
+    """Render multiple (label, url) pairs as a single footer block.
+
+    On terminals supporting OSC 8, returns one line: ``URL: label1  |  label2``
+    with each label clickable. Otherwise returns one labelled URL per line:
+    ``Label1: <url1>\\nLabel2: <url2>``.
+    """
+    valid = [(lbl, url) for lbl, url in pairs if url]
+    if not valid:
+        return None
+    if supports_hyperlinks():
+        parts = [f"[link={url}]{lbl}[/link]" for lbl, url in valid]
+        return "[bold]URL:[/bold] " + "  |  ".join(parts)
+    return "\n".join(f"[bold]{lbl.capitalize()}:[/bold] {url}" for lbl, url in valid)
