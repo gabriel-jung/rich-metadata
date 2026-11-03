@@ -7,11 +7,13 @@ sections, and full detail views.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from rich.console import Console
+from rich.markup import escape as _escape_markup
 from rich.panel import Panel
 from rich.table import Table
 
@@ -199,6 +201,22 @@ class EntityDef:
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
+# C0 and C1 control characters except tab and newline.
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def escape(value: Any) -> str:
+    """Make a data value safe to print through Rich markup.
+
+    Escapes markup (so ``"Live [bonus]"`` prints as written instead of being
+    read as a style tag, and ``"[/]"`` cannot raise ``MarkupError``) and drops
+    control characters, so text from a remote source cannot send escape
+    sequences to the terminal. The engine applies it to every value it reads
+    by ``key``; use it in ``transform`` callables and custom renderers that
+    interpolate data into markup.
+    """
+    return _escape_markup(_CONTROL_CHARS.sub("", str(value)))
+
 
 def _deep_get(d: dict, key: str, default=""):
     """Get a value by key, supporting dot-notation for nested access (e.g. 'author.name')."""
@@ -278,15 +296,21 @@ class DisplayEngine:
         """Render a one-line summary."""
         defn = self._registry.get(entity.get("_type", ""))
         if not defn:
-            self.console.print(f"[bold]{entity.get('name', str(entity))}[/bold]")
+            self.console.print(f"[bold]{escape(entity.get('name', str(entity)))}[/bold]")
             return
 
         parts: list[str] = []
         for f in defn.summary:
             if f.key:
-                val = entity.get(f.key, f.fallback) or f.fallback
+                # Transforms get the raw value and own their markup; plain
+                # values are escaped, the developer's fallback is not.
+                data = entity.get(f.key)
                 if f.transform:
-                    val = f.transform(val)
+                    val = f.transform(data or f.fallback)
+                elif data:
+                    val = escape(data)
+                else:
+                    val = f.fallback
             elif f.transform:
                 val = f.transform(entity)
             else:
@@ -312,6 +336,8 @@ class DisplayEngine:
                 val = entity.get(hf.key, "")
                 if hf.transform:
                     val = hf.transform(val)
+                elif val is not None:
+                    val = escape(val)
             elif hf.transform:
                 val = hf.transform(entity)
             else:
@@ -321,7 +347,11 @@ class DisplayEngine:
                 rows.append((hf.label, str(val)))
 
         grid = info_grid(rows)
-        title = defn.header_title(entity) if defn.header_title else f"[bold]{entity.get('name', '')}[/bold]"
+        title = (
+            defn.header_title(entity)
+            if defn.header_title
+            else f"[bold]{escape(entity.get('name', ''))}[/bold]"
+        )
         panel = Panel(grid, title=title, border_style=defn.panel_border_style)
 
         self.console.print()
@@ -330,7 +360,11 @@ class DisplayEngine:
 
         if defn.footer:
             for item in defn.footer:
-                val = entity.get(item) if isinstance(item, str) else item(entity)
+                if isinstance(item, str):
+                    val = entity.get(item)
+                    val = escape(val) if val else val
+                else:
+                    val = item(entity)
                 if val:
                     self.console.print(f"[dim]{val}[/dim]")
 
@@ -365,7 +399,8 @@ class DisplayEngine:
         elif sec.columns:
             self._render_table(entity, sec)
         else:
-            show_text_panel(self.console, entity.get(sec.key), sec.label)
+            text = entity.get(sec.key)
+            show_text_panel(self.console, escape(text) if text else text, sec.label)
 
     def _render_table(self, entity: dict, sec: SectionDef) -> None:
         """Render a table section. Handles flat lists and grouped dicts uniformly."""
@@ -404,7 +439,7 @@ class DisplayEngine:
         first_group = True
 
         for group_name, items in groups.items():
-            label = group_name.strip().capitalize() if group_name else ""
+            label = escape(str(group_name).strip().capitalize()) if group_name else ""
             if label:
                 if not first_group:
                     table.add_section()
@@ -423,7 +458,9 @@ class DisplayEngine:
                     val = _deep_get(item, col.key)
                     if col.transform:
                         val = col.transform(val)
-                    row.append(str(val) if val is not None else "")
+                        row.append(str(val) if val is not None else "")
+                    else:
+                        row.append(escape(val) if val is not None else "")
                 table.add_row(*row)
                 idx += 1
 

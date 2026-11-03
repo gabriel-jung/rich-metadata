@@ -4,6 +4,7 @@ import base64
 import os
 import sys
 
+from loguru import logger
 from rich.console import Console
 from rich.panel import Panel
 
@@ -14,10 +15,10 @@ IMAGE_COLS = 22
 MIN_PANEL_WIDTH = 40
 
 
-def _detect_protocol() -> str | None:
-    """Detect which inline image protocol the terminal supports."""
+def _detect_protocols() -> tuple[str, ...]:
+    """Inline image protocols the terminal supports, preferred first."""
     if not sys.stdout.isatty():
-        return None
+        return ()
 
     env = os.environ
     term = env.get("TERM", "")
@@ -25,28 +26,28 @@ def _detect_protocol() -> str | None:
     lc_terminal = env.get("LC_TERMINAL", "")
 
     if "kitty" in term or term_program == "ghostty":
-        return "kitty"
+        return ("kitty",)
 
     if term_program == "vscode":
         vscode_version = _parse_version(env.get("TERM_PROGRAM_VERSION", ""))
         if vscode_version >= (1, 110):
-            return "kitty"
+            return ("kitty", "iterm2")
         if vscode_version >= (1, 80):
-            return "iterm2"
-        return None
+            return ("iterm2",)
+        return ()
 
     if term_program in {"iTerm.app", "WezTerm", "mintty"}:
-        return "iterm2"
+        return ("iterm2",)
     if lc_terminal == "iTerm2":
-        return "iterm2"
+        return ("iterm2",)
     if env.get("KONSOLE_VERSION"):
-        return "iterm2"
+        return ("iterm2",)
     if env.get("CURSOR_TRACE_ID"):
-        return "iterm2"
+        return ("iterm2",)
     if term == "contour":
-        return "iterm2"
+        return ("iterm2",)
 
-    return None
+    return ()
 
 
 def _iterm2_image(data: bytes, width: str = "auto", height: str = "8") -> str:
@@ -70,13 +71,26 @@ def _kitty_image(data: bytes, rows: int = 8, cols: int = 20) -> str:
     return "".join(result)
 
 
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
 def get_image_escape(data: bytes, height: int = 8, width: int = 20) -> str | None:
-    """Return the raw escape sequence string for an inline image, or None."""
-    protocol = _detect_protocol()
-    if protocol == "iterm2":
-        return _iterm2_image(data, width=str(width), height=str(height))
-    elif protocol == "kitty":
-        return _kitty_image(data, rows=height, cols=width)
+    """Return the raw escape sequence string for an inline image, or None.
+
+    The iTerm2 protocol takes any image format the terminal can decode. The
+    Kitty protocol is sent as PNG (``f=100``), so other formats (JPEG cover
+    art, for instance) use the next protocol the terminal supports, or are
+    skipped rather than sent as a sequence the terminal cannot show.
+    """
+    is_png = data.startswith(_PNG_SIGNATURE)
+    protocols = _detect_protocols()
+    for protocol in protocols:
+        if protocol == "iterm2":
+            return _iterm2_image(data, width=str(width), height=str(height))
+        if protocol == "kitty" and is_png:
+            return _kitty_image(data, rows=height, cols=width)
+    if protocols:
+        logger.debug("Image skipped: the terminal's image protocol needs PNG data")
     return None
 
 

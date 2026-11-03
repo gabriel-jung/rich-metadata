@@ -208,10 +208,10 @@ def test_header_links_empty():
     assert nav.get_header_links({"_type": "song"}) == []
 
 
-def test_history_empty_initially():
+def test_depth_zero_initially():
     engine = DisplayEngine()
     nav = BaseNavigator(engine)
-    assert nav._history == []
+    assert nav._depth == 0
 
 
 def test_console_property():

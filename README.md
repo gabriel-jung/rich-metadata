@@ -185,13 +185,15 @@ Key methods:
 - **`display_or_navigate(entity, *, json_output=False, full=False)`** -- Dispatch one entity: JSON dump (internal keys stripped), full inline render, or interactive `navigate()`. Used by CLIs that share one code path for `--json` / `--full` / interactive modes.
 - **`search_and_navigate(query, types, *, exact_first=True, json_output=False, full=False)`** -- Search across `types` (each API's `.search()` is called), prefer exact name matches when `exact_first`, then select and navigate. Passes `full=` to `.get()` so backends can fetch eagerly when needed.
 - **`browse(fetch_page=..., *, render_page=None, title=None, page_size=25, full=False, loop=False)`** -- Paginated results with selection. `fetch_page(start, count) -> (results, total)`. `loop=True` re-displays the page after a child view returns (works with both `full` and interactive modes).
-- **`browse_sources(sources, *, full=False)`** -- Pick from named browsable sources (`[(label, fetch_page), ...]`), then browse the selected one. Skips the menu when only one source is supplied.
+- **`browse_sources(sources, *, full=False, loop=True)`** -- Pick from named browsable sources (`[(label, fetch_page), ...]`), then browse the selected one. Skips the menu when only one source is supplied. `loop` is passed to `browse()`, so by default going back from an item returns to its list.
 
 Items with `_type` but no ref (no `url` or whatever `entity_ref_key` is) are treated as **inline entities** -- navigated directly without fetching.
 
+Inside the interactive views, if an API's `.get`, a lazy fetcher or a later page raises, the error is logged, the user sees "Could not fetch ..." and stays where they were, so one failed request does not end the session. `fetch_entity` itself, the first search or page, and the fetch in `search_and_navigate`'s `json_output` / `full` modes let errors propagate to your code. `search_and_navigate` returns False when nothing was found or the pick could not be shown, so a CLI can set a non-zero exit status.
+
 ### `QuitSignal`
 
-`BaseNavigator._input` raises `QuitSignal` (an `Exception` subclass) on Ctrl+C / EOF so the interactive loops can unwind cleanly. Catch it at your CLI entry point to exit quietly:
+The navigator raises `QuitSignal` (an `Exception` subclass) on Ctrl+C / EOF at its prompts or during a fetch, so the interactive loops can unwind cleanly. (The search result list from `DisplayEngine.select_from_list` treats Ctrl+C as cancel and returns.) Catch it at your CLI entry point to exit quietly:
 
 ```python
 from rich_metadata import QuitSignal
@@ -240,8 +242,31 @@ from rich_metadata import get_image_escape, show_image_beside
 escape = get_image_escape(image_bytes, width=20, height=10)
 
 # Show an image beside a Rich renderable
-show_image_beside(console, image_bytes, my_panel, img_width=20)
+show_image_beside(console, image_bytes, my_panel)
 ```
+
+Kitty-protocol terminals (Kitty, Ghostty, recent VS Code) are sent PNG data. Other formats go through the iTerm2 protocol on VS Code, which speaks both, and are skipped on Kitty and Ghostty rather than sent as an image the terminal cannot show. iTerm2-protocol terminals take any format they can decode.
+
+## Escaping data
+
+Values the engine reads by `key` (summary and header fields, table cells, text sections, footer keys, group names) are escaped before they reach Rich markup, so `"Live [bonus]"` prints as written and a stray `"[/]"` cannot crash a render. Control characters are dropped too. Output of your own `transform` callables, `header_title` and footer callables is treated as markup, so escape any data you interpolate there:
+
+```python
+from rich_metadata import escape
+
+HeaderField("Title", transform=lambda d: f"[bold]{escape(d['title'])}[/bold] ({d['year']})")
+```
+
+## Hyperlinks
+
+```python
+from rich_metadata import link, links_line, supports_hyperlinks
+
+link("Homepage", url)                          # clickable label, or the raw URL
+links_line(("site", url1), ("shop", url2))     # one "URL: site | shop" line, or one labelled URL per line
+```
+
+Detection follows the npm `supports-hyperlinks` rules; `FORCE_HYPERLINK=1` / `NO_HYPERLINKS=1` override it.
 
 ## Duration helpers
 
