@@ -84,7 +84,8 @@ def _band_def() -> EntityDef:
         header_image_key="_logo_data",
         sections=[
             SectionDef(
-                "discography", navigable=True,
+                "discography",
+                navigable=True,
                 columns=[
                     TableColumn("Year", "year", width=6),
                     TableColumn("Title", "name", style="bold"),
@@ -295,7 +296,8 @@ class TestDurationTotal:
                 type_name="album",
                 sections=[
                     SectionDef(
-                        "tracklist", duration_key="duration",
+                        "tracklist",
+                        duration_key="duration",
                         columns=[
                             TableColumn("Title", "name"),
                             TableColumn("Duration", "duration", justify="right"),

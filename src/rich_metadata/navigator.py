@@ -64,7 +64,9 @@ class BaseNavigator:
         return item.get(self.entity_ref_key)
 
     def get_lazy_fetcher(
-        self, entity_type: str, section_key: str,
+        self,
+        entity_type: str,
+        section_key: str,
     ) -> Callable[[dict], Any] | None:
         """Return a callable(entity) -> data for lazy sections, or None."""
         fetcher = self._lazy_fetchers.get((entity_type, section_key))
@@ -76,7 +78,10 @@ class BaseNavigator:
         return lambda entity: fetcher(api, entity)
 
     def get_navigable_items(
-        self, entity_type: str, section_key: str, entity: dict,
+        self,
+        entity_type: str,
+        section_key: str,
+        entity: dict,
     ) -> list | None:
         """Return navigable items for a section, or None if not navigable.
 
@@ -145,7 +150,9 @@ class BaseNavigator:
         self._history.append(entity)
         try:
             self._interactive_loop(
-                entity, siblings=siblings, sibling_index=sibling_index,
+                entity,
+                siblings=siblings,
+                sibling_index=sibling_index,
                 can_go_back=can_go_back,
             )
         finally:
@@ -271,10 +278,7 @@ class BaseNavigator:
 
             self.console.print()
             if total_pages > 1:
-                self.console.print(
-                    f"[dim]Page {page + 1}/{total_pages} "
-                    f"({start + 1}-{end} of {total})[/dim]"
-                )
+                self.console.print(f"[dim]Page {page + 1}/{total_pages} ({start + 1}-{end} of {total})[/dim]")
 
             hints = [f"[bold]{start + 1}-{end}[/bold] to select"]
             if page > 0:
@@ -282,9 +286,7 @@ class BaseNavigator:
             if page < total_pages - 1:
                 hints.extend(["[bold]n[/bold]ext", "[bold]l[/bold]ast"])
             self.console.print(f"[dim]{' | '.join(hints)}[/dim]")
-            self.console.print(
-                "[dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]"
-            )
+            self.console.print("[dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]")
 
             raw = self._input("[bold]>[/bold] ")
 
@@ -374,9 +376,7 @@ class BaseNavigator:
             for i, (label, _) in enumerate(sources, 1):
                 self.console.print(f"  [bold cyan]\\[{i}][/bold cyan] {label}")
             self.console.print()
-            self.console.print(
-                "  [dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]"
-            )
+            self.console.print("  [dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]")
 
             raw = self._input("\n[bold]Choose:[/bold] ", lower=False)
 
@@ -421,14 +421,22 @@ class BaseNavigator:
 
         if defn.auto_full:
             self._auto_full_loop(
-                entity, sections, siblings=siblings, sibling_index=sibling_index,
+                entity,
+                sections,
+                siblings=siblings,
+                sibling_index=sibling_index,
                 can_go_back=can_go_back,
             )
             return
 
         self._section_menu(
-            entity, entity_type, defn, sections, header_links,
-            siblings=siblings, sibling_index=sibling_index,
+            entity,
+            entity_type,
+            defn,
+            sections,
+            header_links,
+            siblings=siblings,
+            sibling_index=sibling_index,
             can_go_back=can_go_back,
         )
 
@@ -448,12 +456,13 @@ class BaseNavigator:
         """Print the '0 to go back | Ctrl+C to quit' line."""
         back = len(self._history) > 1 or siblings or can_go_back
         label = "go back" if back else "exit"
-        self.console.print(
-            f"  [dim][bold]0[/bold] to {label} | Ctrl+C to quit[/dim]"
-        )
+        self.console.print(f"  [dim][bold]0[/bold] to {label} | Ctrl+C to quit[/dim]")
 
     def _sibling_hints(
-        self, entity_type: str, siblings: list[dict] | None, idx: int,
+        self,
+        entity_type: str,
+        siblings: list[dict] | None,
+        idx: int,
     ) -> tuple[bool, bool]:
         """Print prev/next hints if siblings are available. Returns (has_prev, has_next)."""
         has_prev = bool(siblings and idx > 0)
@@ -510,8 +519,16 @@ class BaseNavigator:
             self.display.header(entity)
 
     def _section_menu(
-        self, entity, entity_type, defn, sections, header_links,
-        *, siblings=None, sibling_index=0, can_go_back=False,
+        self,
+        entity,
+        entity_type,
+        defn,
+        sections,
+        header_links,
+        *,
+        siblings=None,
+        sibling_index=0,
+        can_go_back=False,
     ):
         """Interactive section menu with lazy fetching and header link navigation."""
         idx = sibling_index
@@ -526,19 +543,13 @@ class BaseNavigator:
                 suffix = " [dim]\u2192[/dim]" if is_nav else ""
 
                 if has_data or is_lazy:
-                    self.console.print(
-                        f"  [bold cyan]\\[{i}][/bold cyan] {sec.label}{suffix}"
-                    )
+                    self.console.print(f"  [bold cyan]\\[{i}][/bold cyan] {sec.label}{suffix}")
                 else:
-                    self.console.print(
-                        f"  [dim]\\[{i}] {sec.label} (empty)[/dim]"
-                    )
+                    self.console.print(f"  [dim]\\[{i}] {sec.label} (empty)[/dim]")
 
             for j, (link_label, _link_type, _link_ref) in enumerate(header_links):
                 menu_idx = len(sections) + 1 + j
-                self.console.print(
-                    f"  [bold cyan]\\[{menu_idx}][/bold cyan] {link_label} [dim]\u2192[/dim]"
-                )
+                self.console.print(f"  [bold cyan]\\[{menu_idx}][/bold cyan] {link_label} [dim]\u2192[/dim]")
 
             self.console.print()
             has_prev, has_next = self._sibling_hints(entity_type, siblings, idx)
@@ -595,7 +606,9 @@ class BaseNavigator:
 
                 if sec.navigable:
                     items = self.get_navigable_items(
-                        entity_type, sec.key, entity,
+                        entity_type,
+                        sec.key,
+                        entity,
                     )
                     if items:
                         n = len(items)
@@ -608,9 +621,7 @@ class BaseNavigator:
                         self.display.header(entity)
 
             elif total_sections < choice <= total_sections + total_header_links:
-                _, link_type, link_ref = header_links[
-                    choice - total_sections - 1
-                ]
+                _, link_type, link_ref = header_links[choice - total_sections - 1]
                 target = self.fetch_entity(link_type, link_ref)
                 if target:
                     self.navigate(target)
@@ -649,8 +660,7 @@ class BaseNavigator:
             self.console.print()
             if total_pages > 1:
                 self.console.print(
-                    f"[dim]Page {page + 1}/{total_pages} "
-                    f"(items {start + 1}-{end} of {total})[/dim]"
+                    f"[dim]Page {page + 1}/{total_pages} (items {start + 1}-{end} of {total})[/dim]"
                 )
 
             hints = [f"[bold]1-{total}[/bold] to select"]
@@ -661,9 +671,7 @@ class BaseNavigator:
 
             self.console.print(f"[dim]{' | '.join(hints)}[/dim]")
             self.console.print()
-            self.console.print(
-                "[dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]"
-            )
+            self.console.print("[dim][bold]0[/bold] to go back | Ctrl+C to quit[/dim]")
 
             raw = self._input("[bold]>[/bold] ")
 
@@ -685,7 +693,9 @@ class BaseNavigator:
             if new_page != page:
                 page = new_page
                 self.display.section_page(
-                    items, start=page * page_size, count=page_size,
+                    items,
+                    start=page * page_size,
+                    count=page_size,
                 )
                 continue
 
@@ -705,11 +715,15 @@ class BaseNavigator:
 
                 if target:
                     self.navigate(
-                        target, siblings=items, sibling_index=idx,
+                        target,
+                        siblings=items,
+                        sibling_index=idx,
                     )
                     if title:
                         self.console.print()
                         self.console.rule(title, style="dim")
                     self.display.section_page(
-                        items, start=page * page_size, count=page_size,
+                        items,
+                        start=page * page_size,
+                        count=page_size,
                     )

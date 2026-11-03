@@ -20,7 +20,8 @@ def configure_logging(verbose: bool) -> None:
 
 
 def resolve_entity_type(
-    args: argparse.Namespace, types: list[str],
+    args: argparse.Namespace,
+    types: list[str],
 ) -> tuple[str | None, str | None]:
     """Extract (entity_type, name_query) from parsed args.
 
@@ -37,9 +38,7 @@ def resolve_entity_type(
 def strip_internal_keys(obj):
     """Remove keys starting with '_' (binary data, internal fields) for JSON output."""
     if isinstance(obj, dict):
-        return {
-            k: strip_internal_keys(v) for k, v in obj.items() if not k.startswith("_")
-        }
+        return {k: strip_internal_keys(v) for k, v in obj.items() if not k.startswith("_")}
     if isinstance(obj, list):
         return [strip_internal_keys(item) for item in obj]
     return obj
@@ -79,8 +78,10 @@ def list_fetcher(items: list):
 
         navigator.browse(fetch_page=list_fetcher(my_items))
     """
+
     def fetch_page(start, count):
         return items[start : start + count], len(items)
+
     return fetch_page
 
 

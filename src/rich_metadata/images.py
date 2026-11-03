@@ -81,14 +81,12 @@ def get_image_escape(data: bytes, height: int = 8, width: int = 20) -> str | Non
 
 
 def show_image_beside(
-    console: Console, image_data: bytes | None, panel: Panel,
+    console: Console,
+    image_data: bytes | None,
+    panel: Panel,
 ) -> None:
     """Display image and panel side by side, or panel only if images unsupported."""
-    escape = (
-        get_image_escape(image_data, height=IMAGE_ROWS, width=IMAGE_COLS)
-        if image_data
-        else None
-    )
+    escape = get_image_escape(image_data, height=IMAGE_ROWS, width=IMAGE_COLS) if image_data else None
 
     wide_enough = escape and console.width >= IMAGE_COLS + 2 + MIN_PANEL_WIDTH
 

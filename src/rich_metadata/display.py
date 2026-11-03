@@ -321,17 +321,11 @@ class DisplayEngine:
                 rows.append((hf.label, str(val)))
 
         grid = info_grid(rows)
-        title = (
-            defn.header_title(entity)
-            if defn.header_title
-            else f"[bold]{entity.get('name', '')}[/bold]"
-        )
+        title = defn.header_title(entity) if defn.header_title else f"[bold]{entity.get('name', '')}[/bold]"
         panel = Panel(grid, title=title, border_style=defn.panel_border_style)
 
         self.console.print()
-        image_data = (
-            entity.get(defn.header_image_key) if defn.header_image_key else None
-        )
+        image_data = entity.get(defn.header_image_key) if defn.header_image_key else None
         show_image_beside(self.console, image_data, panel)
 
         if defn.footer:
@@ -398,7 +392,10 @@ class DisplayEngine:
             table.add_column("#", justify="right", style="dim", width=4)
         for col in sec.columns:
             table.add_column(
-                col.header, style=col.style, justify=col.justify, width=col.width,
+                col.header,
+                style=col.style,
+                justify=col.justify,
+                width=col.width,
             )
 
         total_seconds = 0
@@ -442,14 +439,15 @@ class DisplayEngine:
         self.console.print(table)
 
         if sec.duration_key and all_have_duration and total_seconds > 0:
-            self.console.print(
-                f"  [dim]Total: {format_duration(total_seconds)}[/dim]"
-            )
+            self.console.print(f"  [dim]Total: {format_duration(total_seconds)}[/dim]")
 
     # ── Selection / Pagination helpers ───────────────────────────────────
 
     def section_page(
-        self, items: list[dict], start: int = 0, count: int = 25,
+        self,
+        items: list[dict],
+        start: int = 0,
+        count: int = 25,
     ) -> None:
         """Display a page of items using their summary format."""
         end = min(start + count, len(items))
@@ -457,7 +455,8 @@ class DisplayEngine:
         for i in range(start, end):
             item = items[i]
             self.console.print(
-                f"  [bold cyan]\\[{i + 1}][/bold cyan] ", end="",
+                f"  [bold cyan]\\[{i + 1}][/bold cyan] ",
+                end="",
             )
             self.summary(item)
 
@@ -488,19 +487,16 @@ class DisplayEngine:
             if title:
                 self.console.print(f"\n[bold]{title}[/bold]")
             if total_pages > 1:
-                self.console.print(
-                    f"[dim]Page {page + 1}/{total_pages} — {total} {label}[/dim]\n"
-                )
+                self.console.print(f"[dim]Page {page + 1}/{total_pages} — {total} {label}[/dim]\n")
             else:
                 self.console.print(f"[dim]{total} {label}[/dim]\n")
 
             mixed = len({item.get("_type") for item in items}) > 1
             for i in range(start, end):
-                tag = (
-                    f"[dim]{items[i].get('_type', ''):>6}[/dim] " if mixed else ""
-                )
+                tag = f"[dim]{items[i].get('_type', ''):>6}[/dim] " if mixed else ""
                 self.console.print(
-                    f"  [bold cyan]\\[{i + 1}][/bold cyan] {tag}", end="",
+                    f"  [bold cyan]\\[{i + 1}][/bold cyan] {tag}",
+                    end="",
                 )
                 self.summary(items[i])
 

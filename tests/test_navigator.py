@@ -76,7 +76,8 @@ def test_navigable_items_table():
             type_name="band",
             sections=[
                 SectionDef(
-                    "discography", navigable=True,
+                    "discography",
+                    navigable=True,
                     columns=[TableColumn("Name", "name")],
                 ),
             ],
@@ -122,7 +123,8 @@ def test_navigable_items_custom_extractor():
             type_name="artist",
             sections=[
                 SectionDef(
-                    "bands_overview", label="Bands",
+                    "bands_overview",
+                    label="Bands",
                     navigable=True,
                     nav_items=lambda d: [bi["band"] for bi in d.get("bands_overview", [])],
                 ),
@@ -186,7 +188,8 @@ def test_header_links_with_ref_fn():
             type_name="album",
             header_links=[
                 HeaderLink(
-                    "Band: {band}", "band",
+                    "Band: {band}",
+                    "band",
                     ref_fn=lambda d: f"https://example.com/{d['band_id']}" if d.get("band_id") else None,
                 ),
             ],
